@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:blog_app/core/error/exceptions.dart';
 import 'package:blog_app/features/blog/data/models/blog_model.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 abstract interface class BlogRemoteDataSource {
@@ -11,6 +10,7 @@ abstract interface class BlogRemoteDataSource {
     required File image,
     required BlogModel blog,
   });
+  Future<List<BlogModel>> getAllBlogs();
 }
 
 class BlogRemoteDataSourceImpl implements BlogRemoteDataSource {
@@ -24,6 +24,8 @@ class BlogRemoteDataSourceImpl implements BlogRemoteDataSource {
           await supabaseClient.from('blogs').insert(blog.toJson()).select();
 
       return BlogModel.fromJson(blogData.first);
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -38,6 +40,25 @@ class BlogRemoteDataSourceImpl implements BlogRemoteDataSource {
             image,
           );
       return supabaseClient.storage.from('blogs_images').getPublicUrl(blog.id);
+    } on StorageException catch (e) {
+      throw ServerException(e.message);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<BlogModel>> getAllBlogs() async {
+    try {
+      final blogs =
+          await supabaseClient.from('blogs').select('*, profiles (name)');
+      return blogs
+          .map((blog) => BlogModel.fromJson(blog).copyWith(
+                posterName: blog['profiles']['name'],
+              ))
+          .toList();
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
     } catch (e) {
       throw ServerException(e.toString());
     }
